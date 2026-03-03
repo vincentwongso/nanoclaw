@@ -30,10 +30,15 @@ export async function handleMem0Ipc(
   }
 
   if (!isMain) {
-    await writeIpcResponse(data.taskId, {
-      success: false,
-      message: 'mem0 operations are only available in the main group',
-    }, dataDir, sourceGroup);
+    await writeIpcResponse(
+      data.taskId,
+      {
+        success: false,
+        message: 'mem0 operations are only available in the main group',
+      },
+      dataDir,
+      sourceGroup,
+    );
     return true;
   }
 
@@ -43,16 +48,31 @@ export async function handleMem0Ipc(
     const config = loadMem0Config(path.join(groupsDir, sourceGroup));
     const client = new Mem0Client(config);
     const result = await executeMem0Op(client, data.type, data.args);
-    await writeIpcResponse(data.taskId, { success: true, data: result }, dataDir, sourceGroup);
+    await writeIpcResponse(
+      data.taskId,
+      { success: true, data: result },
+      dataDir,
+      sourceGroup,
+    );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'mem0 operation failed';
-    await writeIpcResponse(data.taskId, { success: false, message }, dataDir, sourceGroup);
+    const message =
+      error instanceof Error ? error.message : 'mem0 operation failed';
+    await writeIpcResponse(
+      data.taskId,
+      { success: false, message },
+      dataDir,
+      sourceGroup,
+    );
   }
 
   return true;
 }
 
-async function executeMem0Op(client: Mem0Client, type: string, args: any): Promise<any> {
+async function executeMem0Op(
+  client: Mem0Client,
+  type: string,
+  args: any,
+): Promise<any> {
   switch (type) {
     case 'mem0_add':
       return client.add(args);
@@ -65,7 +85,8 @@ async function executeMem0Op(client: Mem0Client, type: string, args: any): Promi
     case 'mem0_delete':
       return client.delete(args.memory_id);
     case 'mem0_delete_all':
-      if (!args.confirm) throw new Error('Must pass confirm: true to delete all memories');
+      if (!args.confirm)
+        throw new Error('Must pass confirm: true to delete all memories');
       return client.deleteAll(args.user_id);
     default:
       throw new Error(`Unknown mem0 operation: ${type}`);
@@ -78,6 +99,12 @@ async function writeIpcResponse(
   dataDir: string,
   sourceGroup: string,
 ): Promise<void> {
-  const responsePath = path.join(dataDir, 'ipc', sourceGroup, 'tasks', `${taskId}.response.json`);
+  const responsePath = path.join(
+    dataDir,
+    'ipc',
+    sourceGroup,
+    'tasks',
+    `${taskId}.response.json`,
+  );
   await writeFile(responsePath, JSON.stringify(response, null, 2));
 }

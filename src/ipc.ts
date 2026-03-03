@@ -385,7 +385,12 @@ export async function processTaskIpc(
       break;
 
     default: {
-      const handled = await handleMem0Ipc(data as any, sourceGroup, isMain, DATA_DIR);
+      const handled = await handleMem0Ipc(
+        data as any,
+        sourceGroup,
+        isMain,
+        DATA_DIR,
+      );
       if (!handled) {
         logger.warn({ type: data.type }, 'Unknown IPC task type');
       }

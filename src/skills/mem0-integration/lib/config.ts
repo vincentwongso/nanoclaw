@@ -18,7 +18,7 @@ export function loadMem0Config(groupFolder: string): Mem0Config {
     return JSON.parse(configData);
   } catch (error) {
     throw new Error(
-      `Mem0 not configured. Please run setup script first. Missing: ${configPath}`
+      `Mem0 not configured. Please run setup script first. Missing: ${configPath}`,
     );
   }
 }
@@ -29,9 +29,9 @@ export function loadMem0Config(groupFolder: string): Mem0Config {
 export const defaultConfig = {
   apiUrl: 'http://localhost:8765',
   timeouts: {
-    search: 10000,    // 10 seconds
-    add: 15000,       // 15 seconds
-    update: 10000,    // 10 seconds
-    delete: 5000      // 5 seconds
-  }
+    search: 10000, // 10 seconds
+    add: 15000, // 15 seconds
+    update: 10000, // 10 seconds
+    delete: 5000, // 5 seconds
+  },
 };

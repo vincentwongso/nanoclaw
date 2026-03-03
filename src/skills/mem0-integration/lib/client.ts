@@ -45,9 +45,9 @@ export class Mem0Client {
         user_id: params.user_id || this.config.userId,
         metadata: params.metadata,
         infer: params.infer !== false,
-        output_format: 'v1.1'
+        output_format: 'v1.1',
       }),
-      timeout: defaultConfig.timeouts.add
+      timeout: defaultConfig.timeouts.add,
     });
 
     return response;
@@ -69,9 +69,9 @@ export class Mem0Client {
         user_id: params.user_id || this.config.userId,
         limit: params.limit || 5,
         metadata: params.metadata,
-        output_format: 'v1.1'
+        output_format: 'v1.1',
       }),
-      timeout: defaultConfig.timeouts.search
+      timeout: defaultConfig.timeouts.search,
     });
 
     return response.results || response;
@@ -91,8 +91,8 @@ export class Mem0Client {
       `/v1/memories/?user_id=${userId}&limit=${limit}`,
       {
         method: 'GET',
-        timeout: defaultConfig.timeouts.search
-      }
+        timeout: defaultConfig.timeouts.search,
+      },
     );
 
     return response.results || response;
@@ -105,7 +105,7 @@ export class Mem0Client {
     const response = await this.request(`/v1/memories/${memoryId}/`, {
       method: 'PUT',
       body: JSON.stringify({ data }),
-      timeout: defaultConfig.timeouts.update
+      timeout: defaultConfig.timeouts.update,
     });
 
     return response;
@@ -117,7 +117,7 @@ export class Mem0Client {
   async delete(memoryId: string): Promise<boolean> {
     await this.request(`/v1/memories/${memoryId}/`, {
       method: 'DELETE',
-      timeout: defaultConfig.timeouts.delete
+      timeout: defaultConfig.timeouts.delete,
     });
 
     return true;
@@ -132,7 +132,7 @@ export class Mem0Client {
     await this.request(`/v1/memories/`, {
       method: 'DELETE',
       body: JSON.stringify({ user_id: targetUserId }),
-      timeout: defaultConfig.timeouts.delete
+      timeout: defaultConfig.timeouts.delete,
     });
 
     return true;
@@ -147,7 +147,7 @@ export class Mem0Client {
       method: string;
       body?: string;
       timeout: number;
-    }
+    },
   ): Promise<any> {
     const url = `${this.config.apiUrl}${endpoint}`;
     const controller = new AbortController();
@@ -156,7 +156,7 @@ export class Mem0Client {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        Accept: 'application/json',
       };
 
       // Add auth header if API key is configured
@@ -168,20 +168,21 @@ export class Mem0Client {
         method: options.method,
         headers,
         body: options.body,
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
-          `Mem0 API error (${response.status}): ${errorText}`
-        );
+        throw new Error(`Mem0 API error (${response.status}): ${errorText}`);
       }
 
       // Handle empty responses (DELETE operations)
-      if (response.status === 204 || response.headers.get('content-length') === '0') {
+      if (
+        response.status === 204 ||
+        response.headers.get('content-length') === '0'
+      ) {
         return { success: true };
       }
 
