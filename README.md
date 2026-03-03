@@ -174,6 +174,23 @@ This allows you to use:
 
 Note: The model must support the Anthropic API format for best compatibility.
 
+**How do I start, stop, or restart the service?**
+
+On Linux (systemd):
+```bash
+systemctl --user start nanoclaw
+systemctl --user stop nanoclaw
+systemctl --user restart nanoclaw
+systemctl --user status nanoclaw
+```
+
+On macOS (launchd):
+```bash
+launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
+```
+
 **How do I debug issues?**
 
 Ask Claude Code. "Why isn't the scheduler running?" "What's in the recent logs?" "Why did this message not get a response?" That's the AI-native approach that underlies NanoClaw.

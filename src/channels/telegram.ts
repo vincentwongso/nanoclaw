@@ -2,7 +2,11 @@ import https from 'https';
 
 import { Bot } from 'grammy';
 
-import { ASSISTANT_NAME, TELEGRAM_BOT_TOKEN, TRIGGER_PATTERN } from '../config.js';
+import {
+  ASSISTANT_NAME,
+  TELEGRAM_BOT_TOKEN,
+  TRIGGER_PATTERN,
+} from '../config.js';
 import { registerChannel } from './registry.js';
 import { logger } from '../logger.js';
 import {
