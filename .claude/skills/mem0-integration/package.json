@@ -1,0 +1,27 @@
+{
+  "name": "@nanoclaw/mem0-integration",
+  "version": "1.0.0",
+  "description": "Self-hosted mem0 memory layer for NanoClaw",
+  "type": "module",
+  "scripts": {
+    "setup": "tsx scripts/setup.ts",
+    "test:add": "tsx scripts/add.ts",
+    "test:search": "tsx scripts/search.ts",
+    "test:get-all": "tsx scripts/get-all.ts"
+  },
+  "keywords": [
+    "nanoclaw",
+    "mem0",
+    "memory",
+    "ai",
+    "assistant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}

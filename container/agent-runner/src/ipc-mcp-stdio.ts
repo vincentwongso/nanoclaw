@@ -280,6 +280,113 @@ Use available_groups.json to find the JID for a group. The folder name must be c
   },
 );
 
+// ── Mem0 memory tools ────────────────────────────────────────────────────────
+
+async function mem0Ipc(operation: string, args: unknown): Promise<string> {
+  const taskId = `mem0_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  writeIpcFile(TASKS_DIR, {
+    type: `mem0_${operation}`,
+    taskId,
+    args,
+    groupFolder,
+    timestamp: new Date().toISOString(),
+  });
+
+  const responsePath = path.join(TASKS_DIR, `${taskId}.response.json`);
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const raw = fs.readFileSync(responsePath, 'utf-8');
+      const res = JSON.parse(raw);
+      try { fs.unlinkSync(responsePath); } catch { /* ignore */ }
+      if (!res.success) throw new Error(res.message || 'mem0 operation failed');
+      return JSON.stringify(res.data, null, 2);
+    } catch (err: any) {
+      if (err.code !== 'ENOENT') throw err;
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  throw new Error('mem0 operation timed out after 30 seconds');
+}
+
+function mem0Only(fn: (args: any) => Promise<string>) {
+  return async (args: any) => {
+    if (!isMain) {
+      return { content: [{ type: 'text' as const, text: 'Error: mem0 tools are only available in the main group' }], isError: true };
+    }
+    try {
+      const result = await fn(args);
+      return { content: [{ type: 'text' as const, text: result }] };
+    } catch (err: any) {
+      return { content: [{ type: 'text' as const, text: `Error: ${err.message}` }], isError: true };
+    }
+  };
+}
+
+server.tool(
+  'mem0_add',
+  'Store new memories from messages or conversations. Use to remember user preferences, facts, and context for later retrieval.',
+  {
+    messages: z.array(z.object({
+      role: z.enum(['user', 'assistant']),
+      content: z.string(),
+    })).describe('Conversation messages to extract memories from'),
+    user_id: z.string().optional().describe('User identifier (defaults to configured user)'),
+    infer: z.boolean().optional().describe('Whether to infer structured memories (default: true)'),
+  },
+  mem0Only(args => mem0Ipc('add', args)),
+);
+
+server.tool(
+  'mem0_search',
+  'Search for relevant memories using semantic search. Call this before responding to recall past context.',
+  {
+    query: z.string().describe('Search query to find relevant memories'),
+    user_id: z.string().optional().describe('User identifier (defaults to configured user)'),
+    limit: z.number().optional().describe('Max memories to return (default: 5)'),
+  },
+  mem0Only(args => mem0Ipc('search', args)),
+);
+
+server.tool(
+  'mem0_get_all',
+  'Retrieve all memories for a user. Prefer mem0_search for specific queries.',
+  {
+    user_id: z.string().optional().describe('User identifier (defaults to configured user)'),
+    limit: z.number().optional().describe('Max memories to return (default: 100)'),
+  },
+  mem0Only(args => mem0Ipc('get_all', args)),
+);
+
+server.tool(
+  'mem0_update',
+  'Update an existing memory by ID.',
+  {
+    memory_id: z.string().describe('ID of the memory to update'),
+    data: z.record(z.string(), z.unknown()).describe('Updated memory data'),
+  },
+  mem0Only(args => mem0Ipc('update', args)),
+);
+
+server.tool(
+  'mem0_delete',
+  'Delete a specific memory by ID.',
+  {
+    memory_id: z.string().describe('ID of the memory to delete'),
+  },
+  mem0Only(args => mem0Ipc('delete', args)),
+);
+
+server.tool(
+  'mem0_delete_all',
+  'Delete all memories for a user. Use with extreme caution.',
+  {
+    user_id: z.string().optional().describe('User identifier (defaults to configured user)'),
+    confirm: z.literal(true).describe('Must be true to confirm deletion'),
+  },
+  mem0Only(args => mem0Ipc('delete_all', args)),
+);
+
 // Start the stdio transport
 const transport = new StdioServerTransport();
 await server.connect(transport);

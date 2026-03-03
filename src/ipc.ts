@@ -7,6 +7,7 @@ import { DATA_DIR, IPC_POLL_INTERVAL, TIMEZONE } from './config.js';
 import { AvailableGroup } from './container-runner.js';
 import { createTask, deleteTask, getTaskById, updateTask } from './db.js';
 import { isValidGroupFolder } from './group-folder.js';
+import { handleMem0Ipc } from './skills/mem0-integration/host.js';
 import { logger } from './logger.js';
 import { RegisteredGroup } from './types.js';
 
@@ -383,7 +384,11 @@ export async function processTaskIpc(
       }
       break;
 
-    default:
-      logger.warn({ type: data.type }, 'Unknown IPC task type');
+    default: {
+      const handled = await handleMem0Ipc(data as any, sourceGroup, isMain, DATA_DIR);
+      if (!handled) {
+        logger.warn({ type: data.type }, 'Unknown IPC task type');
+      }
+    }
   }
 }
