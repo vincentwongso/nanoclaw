@@ -32,6 +32,12 @@ Single Node.js process with skill-based channel system. Channels (WhatsApp, Tele
 | `/qodo-pr-resolver` | Fetch and fix Qodo PR review issues interactively or in batch |
 | `/get-qodo-rules` | Load org- and repo-level coding rules from Qodo before code tasks |
 
+## NanoClaw → Claude Code IPC
+
+NanoClaw (running in container) writes requests to `data/ipc/slack/requests_for_claude_code.md` for Claude Code to action outside the container (installs, config changes, code edits).
+
+**At the start of every session:** check this file for `Status: pending` requests, update to `in-progress`, action them, then update to `completed`/`failed`. Write responses to `data/ipc/slack/responses_from_claude_code.md`.
+
 ## Development
 
 Run commands directly—don't tell the user to run them.
