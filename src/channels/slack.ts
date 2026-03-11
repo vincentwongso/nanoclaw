@@ -174,6 +174,40 @@ export class SlackChannel implements Channel {
         is_bot_message: isBotMessage,
       });
     });
+
+    // PII proxy write approval buttons
+    // Note: PII_PROXY_APPROVAL_PORT in NanoClaw's .env must match
+    //       APPROVAL_HTTP_PORT in mcp-servers/pii-proxy/.env (both default to 3099)
+    this.app.action(
+      /^pii_proxy_(approve|deny)_(.+)$/,
+      async ({ action, ack, respond }) => {
+        await ack();
+
+        const actionId = (action as { action_id: string }).action_id;
+        const match = actionId.match(/^pii_proxy_(approve|deny)_(.+)$/);
+        if (!match) return;
+
+        const [, decision, requestId] = match;
+
+        // Ephemeral feedback so the user knows the button press was received
+        await respond({
+          response_type: 'ephemeral',
+          text: decision === 'approve' ? 'Processing approval...' : 'Denying request...',
+        });
+
+        const approvalPort = process.env.PII_PROXY_APPROVAL_PORT ?? '3099';
+        const url = `http://127.0.0.1:${approvalPort}/${decision}/${requestId}`;
+
+        try {
+          const res = await fetch(url, { method: 'POST' });
+          if (!res.ok) {
+            logger.error({ requestId, decision }, `pii-proxy approval callback failed: ${await res.text()}`);
+          }
+        } catch (err) {
+          logger.error({ requestId, decision, err }, 'pii-proxy approval HTTP request failed');
+        }
+      }
+    );
   }
 
   /**
