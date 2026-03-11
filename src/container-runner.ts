@@ -160,9 +160,11 @@ function buildVolumeMounts(
     );
   } else {
     // Merge mcpServers into existing settings (safe for re-runs)
-    const existing = JSON.parse(fs.readFileSync(settingsFile, 'utf-8')) as Record<string, unknown>;
+    const existing = JSON.parse(
+      fs.readFileSync(settingsFile, 'utf-8'),
+    ) as Record<string, unknown>;
     existing.mcpServers = {
-      ...(existing.mcpServers as Record<string, unknown> ?? {}),
+      ...((existing.mcpServers as Record<string, unknown>) ?? {}),
       ...mcpServers,
     };
     fs.writeFileSync(settingsFile, JSON.stringify(existing, null, 2) + '\n');
@@ -306,8 +308,13 @@ function buildVolumeMounts(
     group.folder,
     'agent-runner-src',
   );
-  if (!fs.existsSync(groupAgentRunnerDir) && fs.existsSync(agentRunnerSrc)) {
-    fs.cpSync(agentRunnerSrc, groupAgentRunnerDir, { recursive: true });
+  if (fs.existsSync(agentRunnerSrc)) {
+    // Always sync from host source so container picks up code changes (e.g. new MCP servers).
+    // Per-group customizations are not used in practice; keeping stale copies causes bugs.
+    fs.cpSync(agentRunnerSrc, groupAgentRunnerDir, {
+      recursive: true,
+      force: true,
+    });
   }
   mounts.push({
     hostPath: groupAgentRunnerDir,
@@ -338,6 +345,8 @@ function readSecrets(): Record<string, string> {
     'ANTHROPIC_API_KEY',
     'ANTHROPIC_BASE_URL',
     'ANTHROPIC_AUTH_TOKEN',
+    'NOTION_API_KEY',
+    'NOTION_TASK_DB_ID',
   ]);
 }
 

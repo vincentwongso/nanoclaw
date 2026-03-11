@@ -192,7 +192,10 @@ export class SlackChannel implements Channel {
         // Ephemeral feedback so the user knows the button press was received
         await respond({
           response_type: 'ephemeral',
-          text: decision === 'approve' ? 'Processing approval...' : 'Denying request...',
+          text:
+            decision === 'approve'
+              ? 'Processing approval...'
+              : 'Denying request...',
         });
 
         const approvalPort = process.env.PII_PROXY_APPROVAL_PORT ?? '3099';
@@ -201,12 +204,18 @@ export class SlackChannel implements Channel {
         try {
           const res = await fetch(url, { method: 'POST' });
           if (!res.ok) {
-            logger.error({ requestId, decision }, `pii-proxy approval callback failed: ${await res.text()}`);
+            logger.error(
+              { requestId, decision },
+              `pii-proxy approval callback failed: ${await res.text()}`,
+            );
           }
         } catch (err) {
-          logger.error({ requestId, decision, err }, 'pii-proxy approval HTTP request failed');
+          logger.error(
+            { requestId, decision, err },
+            'pii-proxy approval HTTP request failed',
+          );
         }
-      }
+      },
     );
   }
 
