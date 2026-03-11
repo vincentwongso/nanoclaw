@@ -16,7 +16,7 @@
 - **Spec location after move:** `mcp-servers/pii-proxy/docs/client-api.json` (moved from `data/ipc/slack/client-api-doc.json/client-api-doc.json`).
 - **settings.json guard:** `src/container-runner.ts` only writes `settings.json` if it doesn't exist. The MCP integration task must merge into existing files too — use a read-merge-write strategy.
 - **MCP transport — SSE (not stdio):** The server runs persistently on host port 3098. The design spec diagram label "stdio" is stale; SSE is the correct choice here because the server needs to persist across agent sessions to maintain the SQLite PII map and write queue.
-- **Zod version:** Use `"zod": "^3.22.0"` — NOT v4. The `@modelcontextprotocol/sdk` peer-depends on Zod v3.
+- **No Zod in pii-proxy:** The low-level `Server` API uses raw JSON Schema objects (not Zod schemas), so Zod is not needed as a dependency here at all.
 - **MCP SDK approach:** Use the low-level `Server` class (not `McpServer`) to register tools with raw JSON Schema `inputSchema` from the OpenAPI spec. This preserves per-tool parameter documentation.
 - **Two separate approval port env vars:** `APPROVAL_HTTP_PORT` is the pii-proxy-side setting (in `mcp-servers/pii-proxy/.env`). `PII_PROXY_APPROVAL_PORT` is the NanoClaw-side setting (in NanoClaw's `.env`). Both default to `3099` — they must match.
 - **pnpm workspace:** No `pnpm-workspace.yaml` exists yet. Task 1 must create it so the pii-proxy package is part of the workspace.
@@ -98,8 +98,7 @@ touch mcp-servers/pii-proxy/data/.gitkeep
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@slack/web-api": "^7.0.0",
-    "better-sqlite3": "^11.8.1",
-    "zod": "^3.22.0"
+    "better-sqlite3": "^11.8.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
