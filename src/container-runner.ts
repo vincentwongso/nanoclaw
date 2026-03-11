@@ -121,6 +121,17 @@ function buildVolumeMounts(
   );
   fs.mkdirSync(groupSessionsDir, { recursive: true });
   const settingsFile = path.join(groupSessionsDir, 'settings.json');
+
+  const piiProxyHost = process.env.PII_PROXY_HOST ?? 'host.containers.internal';
+  const piiProxyMcpPort = process.env.PII_PROXY_MCP_PORT ?? '3098';
+
+  const mcpServers = {
+    'pii-proxy': {
+      type: 'sse',
+      url: `http://${piiProxyHost}:${piiProxyMcpPort}/sse`,
+    },
+  };
+
   if (!fs.existsSync(settingsFile)) {
     fs.writeFileSync(
       settingsFile,
@@ -137,11 +148,24 @@ function buildVolumeMounts(
             // https://code.claude.com/docs/en/memory#manage-auto-memory
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: '0',
           },
+          // Enable Notion plugin so agents can manage tasks on the Notion board
+          enabledPlugins: {
+            'Notion@claude-plugins-official': true,
+          },
+          mcpServers,
         },
         null,
         2,
       ) + '\n',
     );
+  } else {
+    // Merge mcpServers into existing settings (safe for re-runs)
+    const existing = JSON.parse(fs.readFileSync(settingsFile, 'utf-8')) as Record<string, unknown>;
+    existing.mcpServers = {
+      ...(existing.mcpServers as Record<string, unknown> ?? {}),
+      ...mcpServers,
+    };
+    fs.writeFileSync(settingsFile, JSON.stringify(existing, null, 2) + '\n');
   }
 
   // Sync skills from container/skills/ into each group's .claude/skills/
@@ -154,6 +178,100 @@ function buildVolumeMounts(
       const dstDir = path.join(skillsDst, skillDir);
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
+  }
+
+  // Sync plugins from host ~/.claude/plugins/cache/ into each group's .claude/plugins/cache/
+  // This allows container agents to use the same Claude Code plugins as the host
+  const hostPluginsCache = path.join(
+    process.env.HOME || '/root',
+    '.claude',
+    'plugins',
+    'cache',
+  );
+  const hostPluginsManifest = path.join(
+    process.env.HOME || '/root',
+    '.claude',
+    'plugins',
+    'installed_plugins.json',
+  );
+  const groupPluginsDir = path.join(groupSessionsDir, 'plugins');
+  const groupPluginsManifest = path.join(
+    groupPluginsDir,
+    'installed_plugins.json',
+  );
+  if (fs.existsSync(hostPluginsCache) && fs.existsSync(hostPluginsManifest)) {
+    const groupPluginsCacheDir = path.join(groupPluginsDir, 'cache');
+    fs.mkdirSync(groupPluginsCacheDir, { recursive: true });
+
+    // Read host manifest to find enabled plugins from settings
+    let hostManifest: { version: number; plugins: Record<string, unknown[]> } =
+      { version: 2, plugins: {} };
+    try {
+      hostManifest = JSON.parse(fs.readFileSync(hostPluginsManifest, 'utf-8'));
+    } catch {
+      /* ignore */
+    }
+
+    // Read group manifest (or start fresh)
+    let groupManifest: { version: number; plugins: Record<string, unknown[]> } =
+      { version: 2, plugins: {} };
+    try {
+      if (fs.existsSync(groupPluginsManifest)) {
+        groupManifest = JSON.parse(
+          fs.readFileSync(groupPluginsManifest, 'utf-8'),
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // Sync each plugin that is enabled in the group settings
+    let settings: { enabledPlugins?: Record<string, boolean> } = {};
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+    } catch {
+      /* ignore */
+    }
+
+    const enabledPlugins = settings.enabledPlugins || {};
+    for (const pluginId of Object.keys(enabledPlugins)) {
+      if (!enabledPlugins[pluginId]) continue;
+      const hostEntries = hostManifest.plugins[pluginId];
+      if (!hostEntries?.length) continue;
+      const entry = hostEntries[0] as {
+        installPath: string;
+        version: string;
+        installedAt: string;
+        lastUpdated: string;
+        gitCommitSha: string;
+      };
+
+      // Derive cache-relative path from host installPath
+      const cacheRelative = entry.installPath.replace(
+        hostPluginsCache + '/',
+        '',
+      );
+      const hostPluginDir = path.join(hostPluginsCache, cacheRelative);
+      const groupPluginDir = path.join(groupPluginsCacheDir, cacheRelative);
+
+      if (fs.existsSync(hostPluginDir) && !fs.existsSync(groupPluginDir)) {
+        fs.cpSync(hostPluginDir, groupPluginDir, { recursive: true });
+      }
+
+      // Update group manifest entry with container-side installPath
+      groupManifest.plugins[pluginId] = [
+        {
+          ...entry,
+          scope: 'user',
+          installPath: `/home/node/.claude/plugins/cache/${cacheRelative}`,
+        },
+      ];
+    }
+
+    fs.writeFileSync(
+      groupPluginsManifest,
+      JSON.stringify(groupManifest, null, 2) + '\n',
+    );
   }
   mounts.push({
     hostPath: groupSessionsDir,
