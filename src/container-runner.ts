@@ -24,6 +24,7 @@ import {
   stopContainer,
 } from './container-runtime.js';
 import { validateAdditionalMounts } from './mount-security.js';
+import { getAccessToken } from './oauth.js';
 import { RegisteredGroup } from './types.js';
 
 // Sentinel markers for robust output parsing (must match agent-runner)
@@ -336,18 +337,28 @@ function buildVolumeMounts(
 }
 
 /**
- * Read allowed secrets from .env for passing to the container via stdin.
+ * Read allowed secrets from .env and credentials for passing to the container via stdin.
  * Secrets are never written to disk or mounted as files.
+ * OAuth token is read directly from ~/.claude/.credentials.json (auto-refreshed).
  */
-function readSecrets(): Record<string, string> {
-  return readEnvFile([
-    'CLAUDE_CODE_OAUTH_TOKEN',
+async function readSecrets(): Promise<Record<string, string>> {
+  const envSecrets = readEnvFile([
+    'CLAUDE_CODE_OAUTH_TOKEN', // fallback for users without credentials.json
     'ANTHROPIC_API_KEY',
     'ANTHROPIC_BASE_URL',
     'ANTHROPIC_AUTH_TOKEN',
     'NOTION_API_KEY',
     'NOTION_TASK_DB_ID',
   ]);
+
+  // OAuth token from credentials file (auto-refreshes if near expiry).
+  // Overrides .env value when credentials.json is available.
+  const oauthToken = await getAccessToken();
+  if (oauthToken) {
+    envSecrets.CLAUDE_CODE_OAUTH_TOKEN = oauthToken;
+  }
+
+  return envSecrets;
 }
 
 function buildContainerArgs(
@@ -427,6 +438,8 @@ export async function runContainerAgent(
   const logsDir = path.join(groupDir, 'logs');
   fs.mkdirSync(logsDir, { recursive: true });
 
+  const secrets = await readSecrets();
+
   return new Promise((resolve) => {
     const container = spawn(CONTAINER_RUNTIME_BIN, containerArgs, {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -440,7 +453,7 @@ export async function runContainerAgent(
     let stderrTruncated = false;
 
     // Pass secrets via stdin (never written to disk or mounted as files)
-    input.secrets = readSecrets();
+    input.secrets = secrets;
     container.stdin.write(JSON.stringify(input));
     container.stdin.end();
     // Remove secrets from input so they don't appear in logs
