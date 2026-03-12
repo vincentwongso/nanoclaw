@@ -1,0 +1,215 @@
+#!/usr/bin/env node
+/**
+ * notion-task — Notion API CLI for NanoClaw
+ *
+ * Auth: NOTION_API_KEY env var (Notion internal integration token)
+ * Database: 320cf700-da30-80b0-89bc-000b8f9e2e0e (NanoClaw Task List)
+ *
+ * Commands:
+ *   notion-task list                                        List all tasks
+ *   notion-task get <page-id>                               Fetch task details
+ *   notion-task update <page-id> --status "In progress"    Update status
+ *   notion-task update <page-id> --agent-status "message"  Update agent status
+ *   notion-task update <page-id> --blocked true|false       Toggle blocked
+ *   notion-task create --name "Task" [--status "Not started"]  Create task
+ */
+
+const API_KEY = process.env.NOTION_API_KEY;
+const DATABASE_ID = process.env.NOTION_TASK_DB_ID || '320cf700-da30-80b1-a763-d2fdfb50085a';
+const BASE_URL = 'https://api.notion.com/v1';
+const NOTION_VERSION = '2022-06-28';
+
+if (!API_KEY) {
+  console.error('Error: NOTION_API_KEY environment variable is not set.');
+  console.error('Create a Notion integration at https://www.notion.so/my-integrations');
+  console.error('and add NOTION_API_KEY=secret_... to your .env file.');
+  process.exit(1);
+}
+
+async function request(method, path, body) {
+  const opts = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'Notion-Version': NOTION_VERSION,
+      'Content-Type': 'application/json',
+    },
+  };
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(`${BASE_URL}${path}`, opts);
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(`Notion API error ${res.status}: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
+}
+
+function extractText(prop) {
+  if (!prop) return '';
+  if (prop.type === 'title') return prop.title?.map(t => t.plain_text).join('') || '';
+  if (prop.type === 'rich_text') return prop.rich_text?.map(t => t.plain_text).join('') || '';
+  if (prop.type === 'select') return prop.select?.name || '';
+  if (prop.type === 'checkbox') return prop.checkbox ? 'true' : 'false';
+  if (prop.type === 'people') return prop.people?.map(p => p.name || p.id).join(', ') || '';
+  if (prop.type === 'status') return prop.status?.name || '';
+  return JSON.stringify(prop);
+}
+
+function formatTask(page) {
+  const p = page.properties;
+  const name = extractText(p['Name'] || p['name'] || p['Title'] || p['title']);
+  const status = extractText(p['Status'] || p['status']);
+  const agentStatus = extractText(p['Agent status'] || p['agent_status'] || p['Agent Status']);
+  const blocked = extractText(p['Agent blocked'] || p['agent_blocked'] || p['Blocked']);
+  const id = page.id;
+
+  const lines = [`ID: ${id}`, `Name: ${name}`, `Status: ${status}`];
+  if (agentStatus) lines.push(`Agent status: ${agentStatus}`);
+  if (blocked) lines.push(`Blocked: ${blocked}`);
+  return lines.join('\n');
+}
+
+async function cmdList() {
+  const data = await request('POST', `/databases/${DATABASE_ID}/query`, {
+    sorts: [{ property: 'Status', direction: 'ascending' }],
+  });
+
+  if (!data.results?.length) {
+    console.log('No tasks found.');
+    return;
+  }
+
+  for (const page of data.results) {
+    console.log(formatTask(page));
+    console.log('---');
+  }
+  console.log(`Total: ${data.results.length} task(s)`);
+}
+
+async function cmdGet(pageId) {
+  if (!pageId) { console.error('Usage: notion-task get <page-id>'); process.exit(1); }
+  // Normalize UUID format
+  const id = pageId.replace(/^https?:\/\/.*notion\.so\/.*?([a-f0-9]{32}).*$/, '$1')
+                   .replace(/([a-f0-9]{8})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{12})/, '$1-$2-$3-$4-$5');
+  const page = await request('GET', `/pages/${id}`);
+  console.log(formatTask(page));
+
+  // Fetch page content
+  const blocks = await request('GET', `/blocks/${id}/children`);
+  if (blocks.results?.length) {
+    console.log('\nContent:');
+    for (const block of blocks.results) {
+      const text = block[block.type]?.rich_text?.map(t => t.plain_text).join('') || '';
+      if (text) console.log(text);
+    }
+  }
+}
+
+async function cmdUpdate(pageId, args) {
+  if (!pageId) { console.error('Usage: notion-task update <page-id> [--status ...] [--agent-status ...] [--blocked true|false]'); process.exit(1); }
+
+  const id = pageId.replace(/^https?:\/\/.*notion\.so\/.*?([a-f0-9]{32}).*$/, '$1')
+                   .replace(/([a-f0-9]{8})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{12})/, '$1-$2-$3-$4-$5');
+
+  // Parse --flag value pairs
+  const flags = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--') && i + 1 < args.length) {
+      flags[args[i].slice(2)] = args[++i];
+    }
+  }
+
+  const properties = {};
+
+  if (flags['status']) {
+    properties['Status'] = { status: { name: flags['status'] } };
+  }
+  if (flags['agent-status']) {
+    properties['Agent status'] = {
+      rich_text: [{ type: 'text', text: { content: flags['agent-status'] } }],
+    };
+  }
+  if (flags['blocked'] !== undefined) {
+    properties['Agent blocked'] = { checkbox: flags['blocked'] === 'true' };
+  }
+
+  if (Object.keys(properties).length === 0) {
+    console.error('No properties to update. Use --status, --agent-status, or --blocked.');
+    process.exit(1);
+  }
+
+  const page = await request('PATCH', `/pages/${id}`, { properties });
+  console.log('Updated:');
+  console.log(formatTask(page));
+}
+
+async function cmdCreate(args) {
+  const flags = {};
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--') && i + 1 < args.length) {
+      flags[args[i].slice(2)] = args[++i];
+    }
+  }
+
+  if (!flags['name']) {
+    console.error('Usage: notion-task create --name "Task name" [--status "Not started"]');
+    process.exit(1);
+  }
+
+  const properties = {
+    'Name': { title: [{ type: 'text', text: { content: flags['name'] } }] },
+  };
+
+  if (flags['status']) {
+    properties['Status'] = { status: { name: flags['status'] } };
+  } else {
+    properties['Status'] = { status: { name: 'Not started' } };
+  }
+
+  if (flags['agent-status']) {
+    properties['Agent status'] = {
+      rich_text: [{ type: 'text', text: { content: flags['agent-status'] } }],
+    };
+  }
+
+  const page = await request('POST', '/pages', {
+    parent: { database_id: DATABASE_ID },
+    properties,
+  });
+
+  console.log('Created:');
+  console.log(formatTask(page));
+}
+
+async function main() {
+  const [,, cmd, ...rest] = process.argv;
+
+  try {
+    switch (cmd) {
+      case 'list':   await cmdList(); break;
+      case 'get':    await cmdGet(rest[0]); break;
+      case 'update': await cmdUpdate(rest[0], rest.slice(1)); break;
+      case 'create': await cmdCreate(rest); break;
+      default:
+        console.log('Usage: notion-task <command> [options]');
+        console.log('');
+        console.log('Commands:');
+        console.log('  list                                    List all tasks');
+        console.log('  get <page-id>                           Get task details');
+        console.log('  update <page-id> --status "In progress" Update task status');
+        console.log('  update <page-id> --agent-status "msg"   Update agent status field');
+        console.log('  update <page-id> --blocked true|false   Toggle blocked checkbox');
+        console.log('  create --name "Task" [--status "..."]   Create new task');
+        console.log('');
+        console.log('Status values: Not started, In progress, Done');
+        process.exit(cmd ? 1 : 0);
+    }
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+main();

@@ -47,6 +47,66 @@ When you learn something important:
 - Split files larger than 500 lines into folders
 - Keep an index in your memory for the files you create
 
+## Notion Task Board
+
+You have access to the NanoClaw Task List on Notion. Use it to track work and request Claude Code actions.
+
+**Board**: NanoClaw Task List — `https://www.notion.so/320cf700da3080b1a763d2fdfb50085a`
+**Database ID**: `320cf700-da30-80b0-89bc-000b8f9e2e0e`
+
+### Page schema
+
+| Property | Type | Values |
+|----------|------|--------|
+| Name | title | Task title |
+| Status | select | Not started / In progress / Done |
+| Agent status | rich_text | What you're doing or need |
+| Agent blocked | checkbox | true if waiting on Claude Code or Vincent |
+| Assign | person | — |
+
+### Available MCP tools (`mcp__claude_ai_Notion__*`)
+
+- `notion-search` — search pages and databases by keyword
+- `notion-fetch` — read a page or database by URL or ID
+- `notion-create-pages` — create a new page (use for new tasks)
+- `notion-update-page` — update properties on an existing page
+- `notion-update-data-source` — update database rows
+- `notion-get-users` — list workspace members
+- `notion-get-teams` — list teams
+- `notion-get-comments` — read comments on a page
+- `notion-create-comment` — add a comment to a page
+- `notion-duplicate-page` — duplicate an existing page
+- `notion-move-pages` — move a page to a different parent
+- `notion-create-database` — create a new database
+
+### Creating a task (request to Claude Code)
+
+```
+mcp__claude_ai_Notion__notion-create-pages with:
+  parent: { database_id: "320cf700-da30-80b0-89bc-000b8f9e2e0e" }
+  properties:
+    Name: { title: [{ text: { content: "Task title" } }] }
+    Status: { select: { name: "Not started" } }
+    Agent status: { rich_text: [{ text: { content: "What you need Claude Code to do" } }] }
+    Agent blocked: { checkbox: true }
+```
+
+### Updating a task status
+
+```
+mcp__claude_ai_Notion__notion-update-page with:
+  page_id: "<page-id>"
+  properties:
+    Status: { select: { name: "In progress" } }
+    Agent status: { rich_text: [{ text: { content: "Working on it..." } }] }
+```
+
+### Fallback
+
+If Notion MCP tools are unavailable, write to `/workspace/ipc/slack/requests_for_claude_code.md`.
+
+---
+
 ## Message Formatting
 
 NEVER use markdown. Only use WhatsApp/Telegram formatting:

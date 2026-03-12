@@ -33,6 +33,13 @@ ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 # Install agent-browser and claude-code globally
 RUN npm install -g agent-browser @anthropic-ai/claude-code
 
+# Install NanoClaw custom scripts as global binaries
+COPY scripts/ /usr/local/lib/nanoclaw-scripts/
+RUN chmod +x /usr/local/lib/nanoclaw-scripts/* && \
+    for f in /usr/local/lib/nanoclaw-scripts/*; do \
+        ln -s "$f" "/usr/local/bin/$(basename $f)"; \
+    done
+
 # Create app directory
 WORKDIR /app
 

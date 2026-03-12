@@ -61,9 +61,7 @@ export async function getAccessToken(): Promise<string | undefined> {
   return oauth.accessToken;
 }
 
-async function refreshAccessToken(
-  creds: ClaudeCredentials,
-): Promise<string> {
+async function refreshAccessToken(creds: ClaudeCredentials): Promise<string> {
   const oauth = creds.claudeAiOauth!;
 
   const res = await fetch(TOKEN_ENDPOINT, {

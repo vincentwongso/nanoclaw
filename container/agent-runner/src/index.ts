@@ -185,10 +185,14 @@ function createPreCompactHook(assistantName?: string): HookCallback {
   };
 }
 
-// Secrets to strip from Bash tool subprocess environments.
+// Secrets that must NEVER leak to Bash subprocesses.
 // These are needed by claude-code for API auth but should never
-// be visible to commands Kit runs.
+// be visible to commands the agent runs.
 const SECRET_ENV_VARS = ['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'];
+
+// Secrets that SHOULD be available to Bash subprocesses (e.g. notion-task CLI).
+// These are set into process.env so child processes inherit them.
+const TOOL_ENV_VARS = ['NOTION_API_KEY', 'NOTION_TASK_DB_ID'];
 
 function createSanitizeBashHook(): HookCallback {
   return async (input, _toolUseId, _context) => {
@@ -432,7 +436,8 @@ async function runQuery(
         'TeamCreate', 'TeamDelete', 'SendMessage',
         'TodoWrite', 'ToolSearch', 'Skill',
         'NotebookEdit',
-        'mcp__nanoclaw__*'
+        'mcp__nanoclaw__*',
+        'mcp__claude_ai_Notion__*',
       ],
       env: sdkEnv,
       permissionMode: 'bypassPermissions',
@@ -448,6 +453,19 @@ async function runQuery(
             NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
           },
         },
+        // Register Notion HTTP MCP server directly — plugin-based loading doesn't
+        // work inside the container because the SDK doesn't load plugins from disk.
+        // Auth is forwarded via the CLAUDE_CODE_OAUTH_TOKEN that Claude.ai uses
+        // to proxy requests to the Notion workspace.
+        ...(sdkEnv.CLAUDE_CODE_OAUTH_TOKEN ? {
+          claude_ai_Notion: {
+            type: 'http' as const,
+            url: 'https://mcp.notion.com/mcp',
+            headers: {
+              Authorization: `Bearer ${sdkEnv.CLAUDE_CODE_OAUTH_TOKEN}`,
+            },
+          },
+        } : {}),
       },
       hooks: {
         PreCompact: [{ hooks: [createPreCompactHook(containerInput.assistantName)] }],
@@ -508,11 +526,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Build SDK env: merge secrets into process.env for the SDK only.
-  // Secrets never touch process.env itself, so Bash subprocesses can't see them.
+  // Build SDK env: merge secrets into a copy of process.env for the SDK.
+  // Sensitive secrets (API keys, OAuth tokens) stay out of process.env
+  // so Bash subprocesses can't see them.
+  // Tool secrets (NOTION_API_KEY etc.) ARE set into process.env so that
+  // CLI tools like notion-task can read them from child processes.
   const sdkEnv: Record<string, string | undefined> = { ...process.env };
   for (const [key, value] of Object.entries(containerInput.secrets || {})) {
     sdkEnv[key] = value;
+    if (TOOL_ENV_VARS.includes(key)) {
+      process.env[key] = value;
+    }
   }
 
   const __dirname = path.dirname(fileURLToPath(import.meta.url));

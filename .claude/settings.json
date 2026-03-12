@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"Exit: $?\")",
+      "Bash(BSQ=/home/vincent/NanoClaw/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3)",
+      "Bash(mkdir -p \"$BSQ/lib/binding/node-v127-linux-x64\")",
+      "Bash(cp \"$BSQ/build/Release/better_sqlite3.node\" \"$BSQ/lib/binding/node-v127-linux-x64/\")",
+      "Bash(pnpm build:*)",
+      "Bash(node -e \"require\\(''./node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3/build/Release/better_sqlite3.node''\\)\")",
+      "Bash(pnpm exec:*)",
+      "Bash(rtk pnpm:*)",
+      "mcp__claude_ai_Notion__notion-update-page",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(rtk curl:*)",
+      "Bash(node -e \":*)",
+      "Bash(journalctl --user -u nanoclaw --since '1 hour ago' -n 100 --no-pager)",
+      "Bash(sqlite3 /home/vincent/NanoClaw/store/messages.db \"SELECT sender_name, content, timestamp, is_bot_message FROM messages WHERE chat_jid LIKE ''slack:%'' ORDER BY timestamp DESC LIMIT 20;\")",
+      "mcp__claude_ai_Notion__notion-search",
+      "Bash(journalctl --user -u nanoclaw --no-pager -n 50)",
+      "Read(//home/vincent/NanoClaw/**)",
+      "Bash(docker run:*)",
+      "Bash(rtk proxy:*)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\(''''id'''',''''ERROR''''\\)\\)\")",
+      "Bash(logrotate --version)",
+      "Bash(/usr/sbin/logrotate --debug --state /home/vincent/NanoClaw/logs/.logrotate.state /home/vincent/NanoClaw/logrotate.conf)",
+      "Bash(ps -p 2828108,2828236 -o pid,ppid,start,cmd)",
+      "Bash(ps -p 2701433 -o pid,cmd)",
+      "Bash(ps -p 2701433 -o pid,ppid,lstart,cmd)",
+      "Bash(ps -p 2701431 -o pid,cmd)",
+      "Bash(kill 2701431 2701433)",
+      "Bash(rtk systemctl:*)",
+      "mcp__notion__API-query-data-source",
+      "Read(//home/vincent/setup/**)",
+      "Read(//home/vincent/.claude/**)",
+      "WebSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "additionalDirectories": [
+      "/home/vincent/.config/systemd/user"
+    ]
+  }
+}
