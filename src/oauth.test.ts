@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 
@@ -30,9 +30,19 @@ vi.mock('./logger.js', () => ({
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
-const CREDENTIALS_PATH = path.join(process.env.HOME || '/root', '.claude', '.credentials.json');
+const CREDENTIALS_PATH = path.join(
+  process.env.HOME || '/root',
+  '.claude',
+  '.credentials.json',
+);
 
-function makeCredentials(overrides: Partial<{ accessToken: string; refreshToken: string; expiresAt: number }> = {}) {
+function makeCredentials(
+  overrides: Partial<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+  }> = {},
+) {
   return JSON.stringify({
     claudeAiOauth: {
       accessToken: overrides.accessToken ?? 'sk-ant-oat01-valid-token',
@@ -86,7 +96,9 @@ describe('oauth', () => {
     });
 
     it('returns undefined when claudeAiOauth is missing', async () => {
-      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ mcpOAuth: {} }));
+      vi.mocked(fs.readFileSync).mockReturnValue(
+        JSON.stringify({ mcpOAuth: {} }),
+      );
 
       const token = await oauth.getAccessToken();
       expect(token).toBeUndefined();
@@ -99,7 +111,6 @@ describe('oauth', () => {
       vi.mocked(fs.readFileSync).mockReturnValue(nearExpiry);
       vi.mocked(fs.existsSync).mockReturnValue(true);
 
-      const newExpiresAt = Date.now() + 7_200_000;
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -128,8 +139,12 @@ describe('oauth', () => {
         vi.mocked(fs.writeFileSync).mock.calls[0][1] as string,
       );
       expect(writtenJson.mcpOAuth).toEqual({});
-      expect(writtenJson.claudeAiOauth.accessToken).toBe('sk-ant-oat01-new-token');
-      expect(writtenJson.claudeAiOauth.refreshToken).toBe('sk-ant-ort01-new-refresh');
+      expect(writtenJson.claudeAiOauth.accessToken).toBe(
+        'sk-ant-oat01-new-token',
+      );
+      expect(writtenJson.claudeAiOauth.refreshToken).toBe(
+        'sk-ant-ort01-new-refresh',
+      );
       expect(writtenJson.claudeAiOauth.scopes).toEqual(['user:inference']);
     });
 

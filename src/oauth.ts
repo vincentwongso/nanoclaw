@@ -61,7 +61,7 @@ export async function getAccessToken(): Promise<string | undefined> {
   return oauth.accessToken;
 }
 
-export async function refreshAccessToken(
+async function refreshAccessToken(
   creds: ClaudeCredentials,
 ): Promise<string> {
   const oauth = creds.claudeAiOauth!;
@@ -79,7 +79,9 @@ export async function refreshAccessToken(
   if (!res.ok) {
     if (res.status === 404) {
       // Refresh token already used by another process — re-read from disk
-      logger.info('OAuth refresh token already used, re-reading credentials from disk');
+      logger.info(
+        'OAuth refresh token already used, re-reading credentials from disk',
+      );
       const freshCreds = readCredentials();
       if (
         freshCreds?.claudeAiOauth &&
@@ -135,11 +137,19 @@ export async function refreshAccessToken(
 export function logTokenStatus(): void {
   const creds = readCredentials();
   if (!creds?.claudeAiOauth) {
-    logger.info('No OAuth credentials found — using ANTHROPIC_API_KEY from .env');
+    logger.info(
+      'No OAuth credentials found — using ANTHROPIC_API_KEY from .env',
+    );
     return;
   }
   const expiresAt = new Date(creds.claudeAiOauth.expiresAt);
   const remaining = creds.claudeAiOauth.expiresAt - Date.now();
+  if (remaining <= 0) {
+    logger.warn(
+      `OAuth token expired at ${expiresAt.toISOString()} — will refresh on next agent invocation`,
+    );
+    return;
+  }
   const hours = Math.floor(remaining / 3_600_000);
   const minutes = Math.floor((remaining % 3_600_000) / 60_000);
   logger.info(
