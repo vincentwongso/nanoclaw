@@ -35,7 +35,19 @@
       "Read(//home/vincent/.claude/**)",
       "WebSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(rtk gh:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(uvx --version)",
+      "Bash(uvx snyk-agent-scan@latest --help)",
+      "Bash(uvx snyk-agent-scan@latest scan --help)",
+      "Bash(uvx snyk-agent-scan@latest scan --skills --json)",
+      "Bash(uvx snyk-agent-scan@latest scan --skills)",
+      "Bash(SNYK_TOKEN=98875d74-ad69-40c2-828c-45dc4162d653 uvx snyk-agent-scan@latest scan --skills)",
+      "Bash(SNYK_TOKEN=98875d74-ad69-40c2-828c-45dc4162d653 uvx snyk-agent-scan@latest scan --skills --json)",
+      "Bash(python3 -c \":*)"
     ],
     "additionalDirectories": [
       "/home/vincent/.config/systemd/user"

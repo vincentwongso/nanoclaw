@@ -1,1 +1,45 @@
 npm run format:fix
+
+# Snyk agent-scan: check skills and MCP configs for security issues
+# Load SNYK_TOKEN from .env
+if [ -f .env ]; then
+  export SNYK_TOKEN=$(grep '^SNYK_TOKEN=' .env | cut -d= -f2)
+fi
+# Only runs when relevant files are staged
+SCAN_PATTERNS="container/skills/ .claude/skills/ groups/*/CLAUDE.md .mcp.json container/agent-runner/src/index.ts"
+CHANGED_FILES=$(git diff --cached --name-only)
+RUN_SCAN=false
+for pattern in $SCAN_PATTERNS; do
+  if echo "$CHANGED_FILES" | grep -q "$pattern"; then
+    RUN_SCAN=true
+    break
+  fi
+done
+
+if [ "$RUN_SCAN" = true ]; then
+  echo "🔍 Running Snyk agent-scan on skills and MCP configs..."
+  uvx snyk-agent-scan@latest scan --skills --json 2>/dev/null | {
+    OUTPUT=$(cat)
+    # Check for high-severity issues in JSON output
+    if echo "$OUTPUT" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    issues = [i for i in data if isinstance(i, dict) and i.get('severity') in ('high', 'critical')]
+    if issues:
+        for i in issues:
+            print(f\"  ❌ [{i.get('severity','?').upper()}] {i.get('description','unknown issue')}\", file=sys.stderr)
+        sys.exit(1)
+except (json.JSONDecodeError, TypeError):
+    pass
+sys.exit(0)
+" 2>&1; then
+      echo "✅ Snyk agent-scan passed"
+    else
+      echo "❌ Snyk agent-scan found high/critical issues. Commit blocked."
+      echo "   Run 'uvx snyk-agent-scan@latest scan --skills' for details."
+      echo "   To bypass: git commit --no-verify"
+      exit 1
+    fi
+  }
+fi
